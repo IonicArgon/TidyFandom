@@ -1,34 +1,46 @@
-import express, { Router, Request, Response } from 'express';
-import FandomScrapeController from '../controllers/FandomScrapeController';
+import express, { Router, Request, Response } from "express";
+import { chromium, Browser } from "@playwright/test";
+import FandomScrapeController from "../controllers/FandomScrapeController";
 
 const fandomScrapeRouter: Router = express.Router();
-const fandomScrapeController = new FandomScrapeController();
+
+// TODO: add a worker thread to handle the browser
+
+// initialize browser and controller
+let browser: Browser;
+let fandomScrapeController: FandomScrapeController;
+chromium.launch().then((b) => {
+  browser = b;
+  fandomScrapeController = new FandomScrapeController(browser);
+});
 
 fandomScrapeRouter.use(express.json());
 
-fandomScrapeRouter.get(
-    '/api/scrape',
-    async (req: Request, res: Response) => {
-        const body = req.body;
-        let url = null;
-        
-        if (body.url) {
-            url = body.url;
-        } else {
-            res.status(400).send({ error: 'Bad Request' });
-            return
-        }
-
-        let title = null;
-        try {
-            title = await fandomScrapeController.scrape(url);
-        } catch (error) {
-            res.status(500).send({ error: error });
-            return
-        }
-
-        res.status(200).send({ title: title });
-    }
+fandomScrapeRouter.post(
+  "/api/scrape",
+  async (req: Request, res: Response) => {
+    const { wiki, page } = req.body;
+    const pageContent = await fandomScrapeController.test(req);
+    res.send(pageContent);
+  }
 );
+
+fandomScrapeRouter.get(
+  "/api/scrape",
+  async (req: Request, res: Response) => {
+
+  }
+);
+
+// graceful shutdown
+process.on("SIGTERM", async () => {
+  await browser.close();
+  process.exit(0);
+});
+
+process.on("SIGINT", async () => {
+  await browser.close();
+  process.exit(0);
+});
 
 export default fandomScrapeRouter;
